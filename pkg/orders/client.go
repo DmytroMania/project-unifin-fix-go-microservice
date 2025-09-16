@@ -61,14 +61,15 @@ func (client *OrdersClient) Start(configFile string) error {
 		return fmt.Errorf("failed to start initiator: %w", err)
 	}
 
-	log.Println("Orders client started successfully")
+	log.Println("[EVENT (OrdersClientStarted)]")
 	return nil
 }
 
 func (client *OrdersClient) Stop() {
 	if client.initiator != nil {
 		client.initiator.Stop()
-		log.Println("Orders client stopped")
+
+		log.Println("[EVENT (OrdersClientStopped)]")
 	}
 }
 
@@ -100,7 +101,7 @@ func (client *OrdersClient) NewOrderSingle(order *OrderInfo) error {
 
 	client.orders[order.ClOrdID] = order
 
-	log.Printf("New order sent: %s (%s %s %f @ %f)", order.ClOrdID, order.Side, order.Symbol, order.OrderQty, order.Price)
+	log.Printf("[SEND (NewOrder)]: %s (%s %s %f @ %f)", order.ClOrdID, order.Side, order.Symbol, order.OrderQty, order.Price)
 	return nil
 }
 
@@ -123,7 +124,7 @@ func (client *OrdersClient) CancelOrder(origClOrdID, symbol, side string) error 
 		return fmt.Errorf("failed to cancel order: %w", err)
 	}
 
-	log.Printf("Cancel request sent for order: %s (new ClOrdID: %s)", origClOrdID, newClOrdID)
+	log.Printf("[SEND (CancelOrder)]: %s (new ClOrdID: %s)", origClOrdID, newClOrdID)
 	return nil
 }
 
@@ -153,7 +154,7 @@ func (client *OrdersClient) ReplaceOrder(origClOrdID string, newOrder *OrderInfo
 
 	client.orders[newOrder.ClOrdID] = newOrder
 
-	log.Printf("Replace request sent for order: %s -> %s", origClOrdID, newOrder.ClOrdID)
+	log.Printf("[SEND (ReplaceOrder)]: %s -> %s", origClOrdID, newOrder.ClOrdID)
 	return nil
 }
 
@@ -180,7 +181,7 @@ func (client *OrdersClient) handleExecutionReport(message *quickfix.Message) {
 	symbol, _ := message.Body.GetString(tag.Symbol)
 	side, _ := message.Body.GetString(tag.Side)
 
-	log.Printf("Execution Report: ClOrdID=%s, OrderID=%s, ExecType=%s, OrdStatus=%s, Symbol=%s, Side=%s",
+	log.Printf("[RECEIVE (ExecutionReport)]: ClOrdID=%s, OrderID=%s, ExecType=%s, OrdStatus=%s, Symbol=%s, Side=%s",
 		clOrdID, orderID, execType, ordStatus, symbol, side)
 
 	if order, exists := client.orders[clOrdID]; exists {
@@ -197,7 +198,7 @@ func (client *OrdersClient) handleOrderCancelReject(message *quickfix.Message) {
 	cxlRejReason, _ := message.Body.GetString(tag.CxlRejReason)
 	text, _ := message.Body.GetString(tag.Text)
 
-	log.Printf("Order Cancel Reject: ClOrdID=%s, OrigClOrdID=%s, Reason=%s, Text=%s",
+	log.Printf("[RECEIVE (OrderCancelReject)]: ClOrdID=%s, OrigClOrdID=%s, Reason=%s, Text=%s",
 		clOrdID, origClOrdID, cxlRejReason, text)
 }
 

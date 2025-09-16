@@ -29,6 +29,7 @@ func CreateSignature(sendingTime string, seqNum int, senderCompID, targetCompID 
 
 func SignLogonMessage(msg *quickfix.Message, sessionID quickfix.SessionID) error {
 	sendingTime, err := msg.Header.GetString(tag.SendingTime)
+
 	if err != nil {
 		return fmt.Errorf("failed to get SendingTime: %w", err)
 	}

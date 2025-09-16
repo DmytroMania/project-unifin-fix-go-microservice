@@ -49,14 +49,14 @@ func (client *MarketDataClient) Start(configFile string) error {
 		return fmt.Errorf("failed to start initiator: %w", err)
 	}
 
-	log.Println("Market Data client started successfully")
+	log.Println("[EVENT (MarketDataClientStarted)]")
 	return nil
 }
 
 func (client *MarketDataClient) Stop() {
 	if client.initiator != nil {
 		client.initiator.Stop()
-		log.Println("Market Data client stopped")
+		log.Println("[EVENT (MarketDataClientStopped)]")
 	}
 }
 
@@ -66,7 +66,7 @@ func (client *MarketDataClient) OnLogon(sessionID quickfix.SessionID) {
 	go func() {
 		time.Sleep(2 * time.Second)
 		if err := client.RequestSecurityList(); err != nil {
-			log.Printf("Failed to request security list: %v", err)
+			log.Printf("[ERROR (SecurityListRequestFailed)]: %v", err)
 		}
 	}()
 }
@@ -103,8 +103,7 @@ func (client *MarketDataClient) SubscribeToMarketData(symbol string) error {
 
 	message.Header.SetString(tag.MsgType, "V")
 
-	log.Printf("Sending Market Data Request for %s", symbol)
-	log.Printf("Message: %s", message.String())
+	log.Printf("[SEND (MarketDataRequest)]: %s", symbol)
 
 	sessionID := client.GetSessionID()
 	if sessionID.SenderCompID == "" || sessionID.TargetCompID == "" {
@@ -116,7 +115,7 @@ func (client *MarketDataClient) SubscribeToMarketData(symbol string) error {
 	}
 
 	client.subscriptions[symbol] = true
-	log.Printf("Subscribed to market data for %s", symbol)
+	log.Printf("[EVENT (MarketDataSubscribed)]: %s", symbol)
 	return nil
 }
 
@@ -136,7 +135,7 @@ func (client *MarketDataClient) UnsubscribeFromMarketData(symbol string) error {
 	}
 
 	delete(client.subscriptions, symbol)
-	log.Printf("Unsubscribed from market data for %s", symbol)
+	log.Printf("[EVENT (MarketDataUnsubscribed)]: %s", symbol)
 	return nil
 }
 
@@ -162,7 +161,7 @@ func (client *MarketDataClient) handleMarketDataSnapshot(message *quickfix.Messa
 	mdReqID, _ := message.Body.GetString(tag.MDReqID)
 	noMDEntries, _ := message.Body.GetInt(tag.NoMDEntries)
 
-	log.Printf("Market Data Snapshot for %s (ReqID: %s, Entries: %d)", symbol, mdReqID, noMDEntries)
+	log.Printf("[RECEIVE (MarketDataSnapshot)]: %s (ReqID: %s, Entries: %d)", symbol, mdReqID, noMDEntries)
 
 	// TODO
 }
@@ -172,11 +171,11 @@ func (client *MarketDataClient) handleSecurityListResponse(message *quickfix.Mes
 	secResponseID, _ := message.Body.GetString(tag.SecurityResponseID)
 	result, _ := message.Body.GetInt(tag.SecurityRequestResult)
 
-	log.Printf("Security List Response (ReqID: %s, ResponseID: %s, Result: %d)", secReqID, secResponseID, result)
+	log.Printf("[RECEIVE (SecurityListResponse)]: ReqID=%s, ResponseID=%s, Result=%d", secReqID, secResponseID, result)
 
 	if result == 0 {
 		noRelatedSym, _ := message.Body.GetInt(tag.NoRelatedSym)
-		log.Printf("Received %d instruments", noRelatedSym)
+		log.Printf("[RECEIVE (InstrumentsCount)]: %d", noRelatedSym)
 
 		// TODO
 	}
@@ -186,7 +185,7 @@ func (client *MarketDataClient) handleMarketDataReject(message *quickfix.Message
 	mdReqID, _ := message.Body.GetString(tag.MDReqID)
 	text, _ := message.Body.GetString(tag.Text)
 
-	log.Printf("Market Data Request Rejected (ReqID: %s): %s", mdReqID, text)
+	log.Printf("[RECEIVE (MarketDataRequestRejected)]: ReqID=%s, Reason=%s", mdReqID, text)
 }
 
 func generateRequestID() string {
