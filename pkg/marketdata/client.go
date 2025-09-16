@@ -18,13 +18,13 @@ import (
 type MarketDataClient struct {
 	*bcb.BCBApplication
 	initiator     *quickfix.Initiator
-	subscriptions map[string]bool
+	subscriptions map[string]string
 }
 
 func NewMarketDataClient() *MarketDataClient {
 	return &MarketDataClient{
 		BCBApplication: bcb.NewBCBApplication(),
-		subscriptions:  make(map[string]bool),
+		subscriptions:  make(map[string]string),
 	}
 }
 
@@ -48,7 +48,6 @@ func (client *MarketDataClient) Start(configFile string) error {
 		return fmt.Errorf("failed to create initiator: %w", err)
 	}
 
-	// Передаем инициатор в BCBApplication для проверки состояния
 	client.BCBApplication.SetInitiator(client.initiator)
 
 	if err := client.initiator.Start(); err != nil {
@@ -79,7 +78,7 @@ func (client *MarketDataClient) OnLogon(sessionID quickfix.SessionID) {
 
 func (client *MarketDataClient) RequestSecurityList() error {
 	message := quickfix.NewMessage()
-	message.Header.SetString(tag.MsgType, "x")
+	message.Body.SetString(tag.MsgType, "x")
 	message.Body.SetString(tag.SecurityReqID, generateRequestID())
 	message.Body.SetInt(tag.SecurityListRequestType, 4)
 
@@ -87,12 +86,14 @@ func (client *MarketDataClient) RequestSecurityList() error {
 }
 
 func (client *MarketDataClient) SubscribeToMarketData(symbol string) error {
-	if client.subscriptions[symbol] {
+	if _, exists := client.subscriptions[symbol]; exists {
 		return fmt.Errorf("already subscribed to %s", symbol)
 	}
 
+	mdReqID := generateRequestID()
+
 	mdReq := marketdatarequest.New(
-		field.NewMDReqID(generateRequestID()),
+		field.NewMDReqID(mdReqID),
 		field.NewSubscriptionRequestType("1"),
 		field.NewMarketDepth(1),
 	)
@@ -128,28 +129,55 @@ func (client *MarketDataClient) SubscribeToMarketData(symbol string) error {
 		return fmt.Errorf("failed to subscribe to %s: %w", symbol, err)
 	}
 
-	client.subscriptions[symbol] = true
+	client.subscriptions[symbol] = mdReqID
 	log.Printf("[EVENT (MarketDataSubscribed)]: %s", symbol)
 	return nil
 }
 
 func (client *MarketDataClient) UnsubscribeFromMarketData(symbol string) error {
-	if !client.subscriptions[symbol] {
+	mdReqID, ok := client.subscriptions[symbol]
+
+	if !ok {
 		return fmt.Errorf("not subscribed to %s", symbol)
 	}
 
-	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "V")
-	message.Body.SetString(tag.MDReqID, generateRequestID())
-	message.Body.SetInt(tag.SubscriptionRequestType, 2)
-	message.Body.SetString(tag.Symbol, symbol)
+	mdReq := marketdatarequest.New(
+		field.NewMDReqID(mdReqID),
+		field.NewSubscriptionRequestType("2"),
+		field.NewMarketDepth(1),
+	)
 
-	if err := quickfix.SendToTarget(message, client.GetSessionID()); err != nil {
+	mdReq.SetMDUpdateType(enum.MDUpdateType_FULL_REFRESH)
+
+	noRelatedSym := marketdatarequest.NewNoRelatedSymRepeatingGroup()
+	rel := noRelatedSym.Add()
+	rel.SetSymbol(symbol)
+	mdReq.SetNoRelatedSym(noRelatedSym)
+
+	noMDEntryTypes := marketdatarequest.NewNoMDEntryTypesRepeatingGroup()
+	e1 := noMDEntryTypes.Add()
+	e1.SetMDEntryType("0")
+	e2 := noMDEntryTypes.Add()
+	e2.SetMDEntryType("1")
+	mdReq.SetNoMDEntryTypes(noMDEntryTypes)
+
+	msg := mdReq.ToMessage()
+	msg.Body.SetInt(1070, 1)
+
+	log.Printf("[SEND (MarketDataRequest UNSUBSCRIBE)]: symbol=%s mdReqID=%s", symbol, mdReqID)
+
+	sessionID := client.GetSessionID()
+	if sessionID.SenderCompID == "" || sessionID.TargetCompID == "" {
+		return fmt.Errorf("no active session")
+	}
+
+	if err := quickfix.SendToTarget(msg, sessionID); err != nil {
 		return fmt.Errorf("failed to unsubscribe from %s: %w", symbol, err)
 	}
 
 	delete(client.subscriptions, symbol)
-	log.Printf("[EVENT (MarketDataUnsubscribed)]: %s", symbol)
+
+	log.Printf("[EVENT (MarketDataUnsubscribed)]: %s (mdReqID=%s)", symbol, mdReqID)
 	return nil
 }
 
