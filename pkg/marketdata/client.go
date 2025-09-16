@@ -79,7 +79,7 @@ func (client *MarketDataClient) OnLogon(sessionID quickfix.SessionID) {
 
 func (client *MarketDataClient) RequestSecurityList() error {
 	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "x")
+	message.Header.SetString(tag.MsgType, "x")
 	message.Body.SetString(tag.SecurityReqID, generateRequestID())
 	message.Body.SetInt(tag.SecurityListRequestType, 4)
 
