@@ -22,6 +22,7 @@ type MarketDataClient struct {
 	subscriptions map[string]string
 	quotes        map[string]Quote
 	subscribers   map[string]int
+	quoteChannels map[string]chan struct{}
 }
 
 type Quote struct {
@@ -40,6 +41,7 @@ func NewMarketDataClient() *MarketDataClient {
 		subscriptions:  make(map[string]string),
 		quotes:         make(map[string]Quote),
 		subscribers:    make(map[string]int),
+		quoteChannels:  make(map[string]chan struct{}),
 	}
 }
 
@@ -269,10 +271,21 @@ func (client *MarketDataClient) parseAndStoreQuotes(snapshot marketdatasnapshotf
 			Stale:     false,
 		}
 
+		hadQuote := client.quotes[symbol].Symbol != ""
+
 		client.quotes[symbol] = quote
 
-		//log.Printf("[STORE (Quote)]: %s - Bid: %.6f, Ask: %.6f, Last: %.6f, Size: %.6f",
-		//	symbol, bid, ask, last, size)
+		if !hadQuote {
+			if ch, exists := client.quoteChannels[symbol]; exists {
+				select {
+				case ch <- struct{}{}:
+				default:
+				}
+			}
+		}
+
+		log.Printf("[STORE (Quote)]: %s - Bid: %.6f, Ask: %.6f, Last: %.6f, Size: %.6f",
+			symbol, bid, ask, last, size)
 	}
 }
 
@@ -302,6 +315,7 @@ func (client *MarketDataClient) GetConnectionStatus() map[string]interface{} {
 	return client.BCBApplication.GetConnectionStatus()
 }
 
+/*
 func (client *MarketDataClient) GetQuotes(symbols []string) map[string]*Quote {
 	result := make(map[string]*Quote)
 
@@ -326,12 +340,73 @@ func (client *MarketDataClient) GetQuotes(symbols []string) map[string]*Quote {
 			log.Printf("[DEBUG] Found quote for %s: Bid=%.6f, Ask=%.6f, Last=%.6f", symbol, quote.Bid, quote.Ask, quote.Last)
 			result[symbol] = &quote
 		} else {
-			log.Printf("[DEBUG] No quote found for %s", symbol)
+			log.Printf("[DEBUG] No quote found for %s, waiting for first data...", symbol)
 			result[symbol] = nil
 		}
 	}
 
 	log.Printf("[DEBUG] Returning quotes: %+v", result)
+	return result
+}
+*/
+
+func (client *MarketDataClient) GetQuotesWithWait(symbols []string, timeout time.Duration) map[string]*Quote {
+	result := make(map[string]*Quote)
+	waitingSymbols := make([]string, 0)
+
+	log.Printf("[DEBUG] GetQuotesWithWait called for symbols: %v", symbols)
+
+	for _, symbol := range symbols {
+		client.subscribers[symbol]++
+
+		if _, exists := client.subscriptions[symbol]; !exists {
+			log.Printf("[DEBUG] No subscription for %s, creating one", symbol)
+			go client.SubscribeToMarketData(symbol)
+		} else {
+			log.Printf("[DEBUG] Subscription exists for %s", symbol)
+		}
+
+		if quote, exists := client.quotes[symbol]; exists {
+			if time.Since(quote.Timestamp) > 90*time.Second {
+				quote.Stale = true
+				log.Printf("[DEBUG] Quote for %s is stale", symbol)
+			}
+
+			log.Printf("[DEBUG] Found existing quote for %s: Bid=%.6f, Ask=%.6f, Last=%.6f", symbol, quote.Bid, quote.Ask, quote.Last)
+			result[symbol] = &quote
+		} else {
+			if _, exists := client.quoteChannels[symbol]; !exists {
+				client.quoteChannels[symbol] = make(chan struct{}, 1)
+			}
+
+			waitingSymbols = append(waitingSymbols, symbol)
+			log.Printf("[DEBUG] No quote found for %s, will wait for first data", symbol)
+		}
+	}
+
+	if len(waitingSymbols) > 0 {
+		log.Printf("[DEBUG] Waiting for quotes for symbols: %v", waitingSymbols)
+
+		timeoutCh := time.After(timeout)
+
+		for _, symbol := range waitingSymbols {
+			select {
+			case <-client.quoteChannels[symbol]:
+				if quote, exists := client.quotes[symbol]; exists {
+					log.Printf("[DEBUG] Received quote for %s: Bid=%.6f, Ask=%.6f, Last=%.6f", symbol, quote.Bid, quote.Ask, quote.Last)
+					result[symbol] = &quote
+				} else {
+					log.Printf("[DEBUG] Channel notified but no quote found for %s", symbol)
+					result[symbol] = nil
+				}
+			case <-timeoutCh:
+				log.Printf("[DEBUG] Timeout waiting for quotes for %s", symbol)
+				result[symbol] = nil
+			}
+		}
+	}
+
+	log.Printf("[DEBUG] Returning quotes with wait: %+v", result)
 	return result
 }
 

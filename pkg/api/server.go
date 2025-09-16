@@ -308,7 +308,7 @@ func (s *Server) getQuotesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	quotes := s.mdClient.GetQuotes(symbols)
+	quotes := s.mdClient.GetQuotesWithWait(symbols, 10*time.Second)
 
 	response := make(map[string]interface{})
 
