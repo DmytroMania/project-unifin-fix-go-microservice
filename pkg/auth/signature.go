@@ -28,12 +28,12 @@ func CreateSignature(sendingTime string, seqNum int, senderCompID, targetCompID 
 }
 
 func SignLogonMessage(msg *quickfix.Message, sessionID quickfix.SessionID) error {
-	sendingTime, err := msg.Body.GetString(tag.SendingTime)
+	sendingTime, err := msg.Header.GetString(tag.SendingTime)
 	if err != nil {
 		return fmt.Errorf("failed to get SendingTime: %w", err)
 	}
 
-	seqNum, err := msg.Body.GetInt(tag.MsgSeqNum)
+	seqNum, err := msg.Header.GetInt(tag.MsgSeqNum)
 	if err != nil {
 		return fmt.Errorf("failed to get MsgSeqNum: %w", err)
 	}

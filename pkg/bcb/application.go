@@ -48,7 +48,7 @@ func (app *BCBApplication) OnLogonError(sessionID quickfix.SessionID, err error)
 }
 
 func (app *BCBApplication) ToAdmin(message *quickfix.Message, sessionID quickfix.SessionID) {
-	msgType, _ := message.Body.GetString(tag.MsgType)
+	msgType, _ := message.Header.GetString(tag.MsgType)
 	log.Printf("ToAdmin called for message type: %s, session: %s", msgType, sessionID)
 
 	switch msgType {
@@ -58,7 +58,7 @@ func (app *BCBApplication) ToAdmin(message *quickfix.Message, sessionID quickfix
 
 		message.Body.SetInt(tag.HeartBtInt, 30)
 		message.Body.SetBool(tag.ResetSeqNumFlag, true)
-		message.Body.SetString(tag.SendingTime, time.Now().UTC().Format("20060102-15:04:05.000"))
+		message.Header.SetString(tag.SendingTime, time.Now().UTC().Format("20060102-15:04:05.000"))
 
 		log.Printf("Message after basic fields: %s", message.String())
 
