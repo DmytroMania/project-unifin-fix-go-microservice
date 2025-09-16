@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/marketdata"
@@ -35,6 +36,8 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/v1/marketdata/subscribe", s.subscribeMarketDataHandler).Methods("POST")
 	s.router.HandleFunc("/api/v1/marketdata/unsubscribe", s.unsubscribeMarketDataHandler).Methods("POST")
 	s.router.HandleFunc("/api/v1/securities", s.requestSecuritiesHandler).Methods("GET")
+
+	s.router.HandleFunc("/api/v1/quotes", s.getQuotesHandler).Methods("GET")
 
 	s.router.HandleFunc("/api/v1/orders", s.createOrderHandler).Methods("POST")
 	s.router.HandleFunc("/api/v1/orders/{orderId}/cancel", s.cancelOrderHandler).Methods("POST")
@@ -283,6 +286,41 @@ func (s *Server) validateOrderRequest(req *OrderRequest) error {
 	}
 
 	return nil
+}
+
+func (s *Server) getQuotesHandler(w http.ResponseWriter, r *http.Request) {
+	symbolsParam := r.URL.Query().Get("symbols")
+	if symbolsParam == "" {
+		s.writeError(w, "symbols parameter is required", http.StatusBadRequest)
+		return
+	}
+
+	var symbols []string
+	for _, symbol := range strings.Split(symbolsParam, ",") {
+		symbol = strings.TrimSpace(symbol)
+		if symbol != "" {
+			symbols = append(symbols, symbol)
+		}
+	}
+
+	if len(symbols) == 0 {
+		s.writeError(w, "at least one symbol is required", http.StatusBadRequest)
+		return
+	}
+
+	quotes := s.mdClient.GetQuotes(symbols)
+
+	response := make(map[string]interface{})
+
+	for _, symbol := range symbols {
+		if quote, exists := quotes[symbol]; exists && quote != nil {
+			response[symbol] = quote
+		} else {
+			response[symbol] = nil
+		}
+	}
+
+	s.writeSuccess(w, response)
 }
 
 func generateOrderID() string {
