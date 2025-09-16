@@ -71,11 +71,15 @@ type OrderRequest struct {
 }
 
 type StatusResponse struct {
-	MarketDataConnected bool      `json:"market_data_connected"`
-	OrdersConnected     bool      `json:"orders_connected"`
-	MarketDataLoggedIn  bool      `json:"market_data_logged_in"`
-	OrdersLoggedIn      bool      `json:"orders_logged_in"`
-	Timestamp           time.Time `json:"timestamp"`
+	MarketDataConnected bool                   `json:"market_data_connected"`
+	OrdersConnected     bool                   `json:"orders_connected"`
+	MarketDataLoggedIn  bool                   `json:"market_data_logged_in"`
+	OrdersLoggedIn      bool                   `json:"orders_logged_in"`
+	MarketDataSessionID string                 `json:"market_data_session_id"`
+	OrdersSessionID     string                 `json:"orders_session_id"`
+	MarketDataDetails   map[string]interface{} `json:"market_data_details"`
+	OrdersDetails       map[string]interface{} `json:"orders_details"`
+	Timestamp           time.Time              `json:"timestamp"`
 }
 
 func (s *Server) healthHandler(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +241,10 @@ func (s *Server) statusHandler(w http.ResponseWriter, r *http.Request) {
 		OrdersConnected:     s.ordersClient.IsConnected(),
 		MarketDataLoggedIn:  s.mdClient.IsLoggedIn(),
 		OrdersLoggedIn:      s.ordersClient.IsLoggedIn(),
+		MarketDataSessionID: s.mdClient.GetSessionID().String(),
+		OrdersSessionID:     s.ordersClient.GetSessionID().String(),
+		MarketDataDetails:   s.mdClient.GetConnectionStatus(),
+		OrdersDetails:       s.ordersClient.GetConnectionStatus(),
 		Timestamp:           time.Now().UTC(),
 	}
 

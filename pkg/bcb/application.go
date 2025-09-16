@@ -13,6 +13,7 @@ type BCBApplication struct {
 	sessionID quickfix.SessionID
 	connected bool
 	loggedIn  bool
+	initiator *quickfix.Initiator
 }
 
 func NewBCBApplication() *BCBApplication {
@@ -63,7 +64,6 @@ func (app *BCBApplication) ToAdmin(message *quickfix.Message, sessionID quickfix
 
 		log.Printf("[SEND (LogonRequestSent)]: %s", sessionID)
 	default:
-		// Убираем логи для других типов сообщений
 	}
 }
 
@@ -71,9 +71,9 @@ func (app *BCBApplication) FromAdmin(message *quickfix.Message, sessionID quickf
 	msgType, _ := message.Body.GetString(tag.MsgType)
 
 	switch msgType {
-	case "A": // Logon response
+	case "A":
 		log.Printf("[RECEIVE (LogonResponse)]: %s", sessionID)
-	case "5": // Logout
+	case "5":
 		log.Printf("[RECEIVE (Logout)]: %s", sessionID)
 	}
 
@@ -81,7 +81,6 @@ func (app *BCBApplication) FromAdmin(message *quickfix.Message, sessionID quickf
 }
 
 func (app *BCBApplication) ToApp(message *quickfix.Message, sessionID quickfix.SessionID) error {
-	// Убираем логи для исходящих приложений
 	return nil
 }
 
@@ -122,13 +121,45 @@ func (app *BCBApplication) handleSecurityList(message *quickfix.Message, session
 }
 
 func (app *BCBApplication) IsConnected() bool {
+	sessionID := app.GetSessionID()
+	if sessionID.SenderCompID == "" || sessionID.TargetCompID == "" {
+		return false
+	}
+
+	if app.initiator == nil {
+		return false
+	}
+
 	return app.connected
 }
 
 func (app *BCBApplication) IsLoggedIn() bool {
+	sessionID := app.GetSessionID()
+	if sessionID.SenderCompID == "" || sessionID.TargetCompID == "" {
+		return false
+	}
+
 	return app.loggedIn
 }
 
 func (app *BCBApplication) GetSessionID() quickfix.SessionID {
 	return app.sessionID
+}
+
+func (app *BCBApplication) SetInitiator(initiator *quickfix.Initiator) {
+	app.initiator = initiator
+}
+
+func (app *BCBApplication) GetConnectionStatus() map[string]interface{} {
+	sessionID := app.GetSessionID()
+
+	status := map[string]interface{}{
+		"connected":     app.connected,
+		"logged_in":     app.loggedIn,
+		"session_id":    sessionID.String(),
+		"has_initiator": app.initiator != nil,
+		"has_session":   sessionID.SenderCompID != "" && sessionID.TargetCompID != "",
+	}
+
+	return status
 }

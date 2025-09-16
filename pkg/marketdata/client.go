@@ -125,9 +125,9 @@ func (client *MarketDataClient) UnsubscribeFromMarketData(symbol string) error {
 	}
 
 	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "V") // Market Data Request
+	message.Body.SetString(tag.MsgType, "V")
 	message.Body.SetString(tag.MDReqID, generateRequestID())
-	message.Body.SetInt(tag.SubscriptionRequestType, 2) // Unsubscribe
+	message.Body.SetInt(tag.SubscriptionRequestType, 2)
 	message.Body.SetString(tag.Symbol, symbol)
 
 	if err := quickfix.SendToTarget(message, client.GetSessionID()); err != nil {

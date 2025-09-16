@@ -57,6 +57,8 @@ func (client *OrdersClient) Start(configFile string) error {
 		return fmt.Errorf("failed to create initiator: %w", err)
 	}
 
+	client.BCBApplication.SetInitiator(client.initiator)
+
 	if err := client.initiator.Start(); err != nil {
 		return fmt.Errorf("failed to start initiator: %w", err)
 	}
@@ -134,7 +136,7 @@ func (client *OrdersClient) ReplaceOrder(origClOrdID string, newOrder *OrderInfo
 	}
 
 	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "G") // Order Cancel/Replace Request
+	message.Body.SetString(tag.MsgType, "G")
 
 	message.Body.SetString(tag.ClOrdID, newOrder.ClOrdID)
 	message.Body.SetString(tag.OrigClOrdID, origClOrdID)
@@ -162,9 +164,9 @@ func (client *OrdersClient) FromApp(message *quickfix.Message, sessionID quickfi
 	msgType, _ := message.Body.GetString(tag.MsgType)
 
 	switch msgType {
-	case "8": // Execution Report
+	case "8":
 		client.handleExecutionReport(message)
-	case "9": // Order Cancel Reject
+	case "9":
 		client.handleOrderCancelReject(message)
 	default:
 		return client.BCBApplication.FromApp(message, sessionID)
@@ -209,6 +211,10 @@ func (client *OrdersClient) GetOrderStatus(clOrdID string) (*OrderInfo, bool) {
 
 func (client *OrdersClient) GetAllOrders() map[string]*OrderInfo {
 	return client.orders
+}
+
+func (client *OrdersClient) GetConnectionStatus() map[string]interface{} {
+	return client.BCBApplication.GetConnectionStatus()
 }
 
 func generateOrderID() string {
