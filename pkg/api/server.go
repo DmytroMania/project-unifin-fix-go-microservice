@@ -102,12 +102,13 @@ func (s *Server) subscribeMarketDataHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	if err := s.mdClient.SubscribeToMarketData(req.Symbol); err != nil {
+	// Ждем подтверждения подписки (таймаут 10 секунд)
+	if err := s.mdClient.SubscribeToMarketDataWithWait(req.Symbol, 10*time.Second); err != nil {
 		s.writeError(w, fmt.Sprintf("Failed to subscribe: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	s.writeSuccess(w, fmt.Sprintf("Subscribed to %s", req.Symbol))
+	s.writeSuccess(w, fmt.Sprintf("Successfully subscribed to %s", req.Symbol))
 }
 
 func (s *Server) unsubscribeMarketDataHandler(w http.ResponseWriter, r *http.Request) {

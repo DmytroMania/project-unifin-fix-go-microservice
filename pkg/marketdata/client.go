@@ -23,6 +23,7 @@ type MarketDataClient struct {
 	quotes        map[string]Quote
 	subscribers   map[string]int
 	quoteChannels map[string]chan struct{}
+	subChannels   map[string]chan error
 }
 
 type Quote struct {
@@ -42,6 +43,7 @@ func NewMarketDataClient() *MarketDataClient {
 		quotes:         make(map[string]Quote),
 		subscribers:    make(map[string]int),
 		quoteChannels:  make(map[string]chan struct{}),
+		subChannels:    make(map[string]chan error),
 	}
 }
 
@@ -147,9 +149,31 @@ func (client *MarketDataClient) SubscribeToMarketData(symbol string) error {
 		return fmt.Errorf("failed to subscribe to %s: %w", symbol, err)
 	}
 
+	client.subChannels[symbol] = make(chan error, 1)
 	client.subscriptions[symbol] = mdReqID
-	log.Printf("[EVENT (MarketDataSubscribed)]: %s", symbol)
+	log.Printf("[EVENT (MarketDataRequestSent)]: %s", symbol)
 	return nil
+}
+
+func (client *MarketDataClient) SubscribeToMarketDataWithWait(symbol string, timeout time.Duration) error {
+	if err := client.SubscribeToMarketData(symbol); err != nil {
+		return err
+	}
+
+	select {
+	case err := <-client.subChannels[symbol]:
+		if err != nil {
+			delete(client.subscriptions, symbol)
+			delete(client.subChannels, symbol)
+			return err
+		}
+		log.Printf("[EVENT (MarketDataSubscribed)]: %s", symbol)
+		return nil
+	case <-time.After(timeout):
+		delete(client.subscriptions, symbol)
+		delete(client.subChannels, symbol)
+		return fmt.Errorf("timeout waiting for subscription confirmation for %s", symbol)
+	}
 }
 
 func (client *MarketDataClient) UnsubscribeFromMarketData(symbol string) error {
@@ -226,10 +250,44 @@ func (client *MarketDataClient) handleMarketDataSnapshot(message *quickfix.Messa
 	snapshot := marketdatasnapshotfullrefresh.FromMessage(message)
 
 	symbol, _ := snapshot.GetSymbol()
-	//mdReqID, _ := snapshot.GetMDReqID() // for debug
-	//noMDEntries, _ := snapshot.GetNoMDEntries() // for debug
+	mdReqID, _ := snapshot.GetMDReqID()
+	noMDEntries, _ := snapshot.GetNoMDEntries()
 
-	//log.Printf("[RECEIVE (MarketDataSnapshot)]: %s (ReqID: %s, Entries: %d)", symbol, mdReqID, noMDEntries)
+	log.Printf("[RECEIVE (MarketDataSnapshot)]: %s (ReqID: %s, Entries: %d)", symbol, mdReqID, noMDEntries)
+
+	if noMDEntries.Len() == 0 {
+		log.Printf("[WARNING] No market data available for symbol: %s (ReqID: %s)", symbol, mdReqID)
+
+		if reqID, exists := client.subscriptions[symbol]; exists && reqID == mdReqID {
+			delete(client.subscriptions, symbol)
+			log.Printf("[EVENT (MarketDataSubscriptionRemoved)]: %s - Symbol not found", symbol)
+
+			if ch, exists := client.subChannels[symbol]; exists {
+				select {
+				case ch <- fmt.Errorf("symbol %s not found", symbol):
+				default:
+				}
+				delete(client.subChannels, symbol)
+			}
+		}
+
+		if ch, exists := client.quoteChannels[symbol]; exists {
+			select {
+			case ch <- struct{}{}:
+			default:
+			}
+		}
+
+		return
+	}
+
+	if ch, exists := client.subChannels[symbol]; exists {
+		select {
+		case ch <- nil:
+		default:
+		}
+		delete(client.subChannels, symbol)
+	}
 
 	client.parseAndStoreQuotes(snapshot, symbol)
 }
@@ -309,6 +367,29 @@ func (client *MarketDataClient) handleMarketDataReject(message *quickfix.Message
 	text, _ := message.Body.GetString(tag.Text)
 
 	log.Printf("[RECEIVE (MarketDataRequestRejected)]: ReqID=%s, Reason=%s", mdReqID, text)
+
+	for symbol, reqID := range client.subscriptions {
+		if reqID == mdReqID {
+			delete(client.subscriptions, symbol)
+			log.Printf("[EVENT (MarketDataSubscriptionRemoved)]: %s - Request rejected", symbol)
+
+			if ch, exists := client.subChannels[symbol]; exists {
+				select {
+				case ch <- fmt.Errorf("subscription rejected: %s", text):
+				default:
+				}
+				delete(client.subChannels, symbol)
+			}
+
+			if ch, exists := client.quoteChannels[symbol]; exists {
+				select {
+				case ch <- struct{}{}:
+				default:
+				}
+			}
+			break
+		}
+	}
 }
 
 func (client *MarketDataClient) GetConnectionStatus() map[string]interface{} {
@@ -392,7 +473,11 @@ func (client *MarketDataClient) GetQuotesWithWait(symbols []string, timeout time
 		for _, symbol := range waitingSymbols {
 			select {
 			case <-client.quoteChannels[symbol]:
-				if quote, exists := client.quotes[symbol]; exists {
+				// Проверяем, есть ли подписка - если нет, значит символ не найден
+				if _, exists := client.subscriptions[symbol]; !exists {
+					log.Printf("[DEBUG] Symbol %s not found (subscription removed)", symbol)
+					result[symbol] = nil
+				} else if quote, exists := client.quotes[symbol]; exists {
 					log.Printf("[DEBUG] Received quote for %s: Bid=%.6f, Ask=%.6f, Last=%.6f", symbol, quote.Bid, quote.Ask, quote.Last)
 					result[symbol] = &quote
 				} else {
