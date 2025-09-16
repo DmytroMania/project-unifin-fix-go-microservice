@@ -8,6 +8,9 @@ import (
 
 	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/bcb"
 	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/logging"
+	"github.com/quickfixgo/enum"
+	"github.com/quickfixgo/field"
+	"github.com/quickfixgo/fix44/marketdatarequest"
 	"github.com/quickfixgo/quickfix"
 	"github.com/quickfixgo/tag"
 )
@@ -44,6 +47,9 @@ func (client *MarketDataClient) Start(configFile string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create initiator: %w", err)
 	}
+
+	// Передаем инициатор в BCBApplication для проверки состояния
+	client.BCBApplication.SetInitiator(client.initiator)
 
 	if err := client.initiator.Start(); err != nil {
 		return fmt.Errorf("failed to start initiator: %w", err)
@@ -85,32 +91,40 @@ func (client *MarketDataClient) SubscribeToMarketData(symbol string) error {
 		return fmt.Errorf("already subscribed to %s", symbol)
 	}
 
-	message := quickfix.NewMessage()
+	mdReq := marketdatarequest.New(
+		field.NewMDReqID(generateRequestID()),
+		field.NewSubscriptionRequestType("1"),
+		field.NewMarketDepth(1),
+	)
 
-	message.Body.SetString(tag.MsgType, "V")
-	message.Body.SetString(tag.MDReqID, generateRequestID())
-	message.Body.SetInt(tag.SubscriptionRequestType, 1)
-	message.Body.SetInt(tag.MarketDepth, 0)
-	message.Body.SetInt(tag.MDUpdateType, 0)
-	message.Body.SetInt(tag.MDQuoteType, 1)
+	mdReq.SetMDUpdateType(enum.MDUpdateType_FULL_REFRESH)
 
-	message.Body.SetString(tag.Symbol, symbol)
+	noRelatedSym := marketdatarequest.NewNoRelatedSymRepeatingGroup()
+	rel := noRelatedSym.Add()
+	rel.SetSymbol(symbol)
+	mdReq.SetNoRelatedSym(noRelatedSym)
 
-	message.Body.SetInt(tag.NoMDEntryTypes, 2)
+	noMDEntryTypes := marketdatarequest.NewNoMDEntryTypesRepeatingGroup()
+	entryBid := noMDEntryTypes.Add()
+	entryBid.SetMDEntryType("0")
 
-	message.Body.SetString(tag.MDEntryType, "0")
-	message.Body.SetString(tag.MDEntryType, "1")
+	entryOffer := noMDEntryTypes.Add()
+	entryOffer.SetMDEntryType("1")
 
-	message.Header.SetString(tag.MsgType, "V")
+	mdReq.SetNoMDEntryTypes(noMDEntryTypes)
 
-	log.Printf("[SEND (MarketDataRequest)]: %s", symbol)
+	msg := mdReq.ToMessage()
+
+	msg.Body.SetInt(1070, 1)
+
+	log.Printf("[SEND (MarketDataRequest)]: symbol=%s", symbol)
 
 	sessionID := client.GetSessionID()
 	if sessionID.SenderCompID == "" || sessionID.TargetCompID == "" {
 		return fmt.Errorf("no active session")
 	}
 
-	if err := quickfix.SendToTarget(message, sessionID); err != nil {
+	if err := quickfix.SendToTarget(msg, sessionID); err != nil {
 		return fmt.Errorf("failed to subscribe to %s: %w", symbol, err)
 	}
 
@@ -186,6 +200,10 @@ func (client *MarketDataClient) handleMarketDataReject(message *quickfix.Message
 	text, _ := message.Body.GetString(tag.Text)
 
 	log.Printf("[RECEIVE (MarketDataRequestRejected)]: ReqID=%s, Reason=%s", mdReqID, text)
+}
+
+func (client *MarketDataClient) GetConnectionStatus() map[string]interface{} {
+	return client.BCBApplication.GetConnectionStatus()
 }
 
 func generateRequestID() string {
