@@ -102,8 +102,10 @@ func (s *Server) subscribeMarketDataHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Ждем подтверждения подписки (таймаут 10 секунд)
+	// Timeout 10 seconds to subscribe
 	if err := s.mdClient.SubscribeToMarketDataWithWait(req.Symbol, 10*time.Second); err != nil {
+		log.Printf("Subscribe to market data with timeout")
+
 		s.writeError(w, fmt.Sprintf("Failed to subscribe: %v", err), http.StatusInternalServerError)
 		return
 	}
