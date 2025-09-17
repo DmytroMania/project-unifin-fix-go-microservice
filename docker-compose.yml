@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  bcb-fix-microservice:
+    build: .
+    ports:
+      - "8085:8085"
+    environment:
+      - PORT=8085
+      - MD_CONFIG_PATH=/app/config/market_data.cfg
+      - OE_CONFIG_PATH=/app/config/order_entry.cfg
+    volumes:
+      - ./config:/app/config
+      - ./log:/app/log
+    restart: unless-stopped

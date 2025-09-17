@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -15,12 +16,16 @@ import (
 func main() {
 	log.Println("[EVENT (MicroserviceStarting)]: BCB Markets FIX Microservice")
 
+	port := getEnvInt("PORT", 8085)
+	mdConfigPath := getEnvString("MD_CONFIG_PATH", "config/market_data.cfg")
+	oeConfigPath := getEnvString("OE_CONFIG_PATH", "config/order_entry.cfg")
+
 	mdClient := marketdata.NewMarketDataClient()
 	ordersClient := orders.NewOrdersClient()
 
 	log.Println("[EVENT (MarketDataClientStarting)]")
 
-	if err := mdClient.Start("config/market_data.cfg"); err != nil {
+	if err := mdClient.Start(mdConfigPath); err != nil {
 		log.Fatalf("Failed to start Market Data client: %v", err)
 	}
 
@@ -30,7 +35,7 @@ func main() {
 
 	log.Println("[EVENT (OrdersClientStarting)]")
 
-	if err := ordersClient.Start("config/order_entry.cfg"); err != nil {
+	if err := ordersClient.Start(oeConfigPath); err != nil {
 		log.Fatalf("Failed to start Orders client: %v", err)
 	}
 
@@ -41,9 +46,9 @@ func main() {
 	apiServer := api.NewServer(mdClient, ordersClient)
 
 	go func() {
-		log.Println("[EVENT (HTTPServerStarting)]: Port 8080")
+		log.Printf("[EVENT (HTTPServerStarting)]: Port %d", port)
 
-		if err := apiServer.Start(8080); err != nil {
+		if err := apiServer.Start(port); err != nil {
 			log.Fatalf("Failed to start HTTP server: %v", err)
 		}
 	}()
@@ -55,4 +60,20 @@ func main() {
 
 	<-c
 	log.Println("[EVENT (MicroserviceShuttingDown)]")
+}
+
+func getEnvString(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
 }
