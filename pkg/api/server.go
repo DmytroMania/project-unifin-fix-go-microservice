@@ -43,7 +43,9 @@ func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/api/v1/orders/{orderId}/cancel", s.cancelOrderHandler).Methods("POST")
 	s.router.HandleFunc("/api/v1/orders/{orderId}/replace", s.replaceOrderHandler).Methods("POST")
 	s.router.HandleFunc("/api/v1/orders/{orderId}", s.getOrderHandler).Methods("GET")
+	s.router.HandleFunc("/api/v1/orders/{orderId}/executions", s.getOrderExecutionsHandler).Methods("GET")
 	s.router.HandleFunc("/api/v1/orders", s.getAllOrdersHandler).Methods("GET")
+	s.router.HandleFunc("/api/v1/executions", s.getAllExecutionsHandler).Methods("GET")
 
 	s.router.HandleFunc("/api/v1/status", s.statusHandler).Methods("GET")
 }
@@ -239,6 +241,24 @@ func (s *Server) getOrderHandler(w http.ResponseWriter, r *http.Request) {
 func (s *Server) getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	orders := s.ordersClient.GetAllOrders()
 	s.writeSuccess(w, orders)
+}
+
+func (s *Server) getOrderExecutionsHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	orderID := vars["orderId"]
+
+	executions, exists := s.ordersClient.GetOrderExecutions(orderID)
+	if !exists {
+		s.writeError(w, "Order not found", http.StatusNotFound)
+		return
+	}
+
+	s.writeSuccess(w, executions)
+}
+
+func (s *Server) getAllExecutionsHandler(w http.ResponseWriter, r *http.Request) {
+	executions := s.ordersClient.GetAllExecutions()
+	s.writeSuccess(w, executions)
 }
 
 func (s *Server) statusHandler(w http.ResponseWriter, r *http.Request) {
