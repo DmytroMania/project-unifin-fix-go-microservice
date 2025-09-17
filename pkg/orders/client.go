@@ -81,7 +81,7 @@ func (client *OrdersClient) NewOrderSingle(order *OrderInfo) error {
 	}
 
 	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "D")
+	message.Header.SetString(tag.MsgType, "D")
 
 	message.Body.SetString(tag.ClOrdID, order.ClOrdID)
 	message.Body.SetString(tag.Symbol, order.Symbol)
@@ -114,7 +114,7 @@ func (client *OrdersClient) CancelOrder(origClOrdID, symbol, side string) error 
 
 	newClOrdID := generateOrderID()
 	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "F")
+	message.Header.SetString(tag.MsgType, "F")
 
 	message.Body.SetString(tag.ClOrdID, newClOrdID)
 	message.Body.SetString(tag.OrigClOrdID, origClOrdID)
@@ -136,7 +136,7 @@ func (client *OrdersClient) ReplaceOrder(origClOrdID string, newOrder *OrderInfo
 	}
 
 	message := quickfix.NewMessage()
-	message.Body.SetString(tag.MsgType, "G")
+	message.Header.SetString(tag.MsgType, "G")
 
 	message.Body.SetString(tag.ClOrdID, newOrder.ClOrdID)
 	message.Body.SetString(tag.OrigClOrdID, origClOrdID)
@@ -161,7 +161,7 @@ func (client *OrdersClient) ReplaceOrder(origClOrdID string, newOrder *OrderInfo
 }
 
 func (client *OrdersClient) FromApp(message *quickfix.Message, sessionID quickfix.SessionID) quickfix.MessageRejectError {
-	msgType, _ := message.Body.GetString(tag.MsgType)
+	msgType, _ := message.Header.GetString(tag.MsgType)
 
 	switch msgType {
 	case "8":
