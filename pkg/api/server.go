@@ -35,24 +35,24 @@ func NewServer(mdClient *marketdata.MarketDataClient, ordersClient *orders.Order
 func (s *Server) setupRoutes() {
 	s.router.HandleFunc("/health", s.healthHandler).Methods("GET")
 
-	s.router.HandleFunc("/api/v1/marketdata/subscribe", s.subscribeMarketDataHandler).Methods("POST")
-	s.router.HandleFunc("/api/v1/marketdata/unsubscribe", s.unsubscribeMarketDataHandler).Methods("POST")
-	s.router.HandleFunc("/api/v1/securities", s.requestSecuritiesHandler).Methods("GET")
+	s.router.HandleFunc("/api/marketdata/subscribe", s.subscribeMarketDataHandler).Methods("POST")
+	s.router.HandleFunc("/api/marketdata/unsubscribe", s.unsubscribeMarketDataHandler).Methods("POST")
+	s.router.HandleFunc("/api/securities", s.requestSecuritiesHandler).Methods("GET")
 
-	s.router.HandleFunc("/api/v1/quotes", s.getQuotesHandler).Methods("GET")
+	s.router.HandleFunc("/api/quotes", s.getQuotesHandler).Methods("GET")
 
-	s.router.HandleFunc("/api/v1/exchange", s.createExchangeHandler).Methods("POST")
-	s.router.HandleFunc("/api/v1/exchange/{exchangeId}", s.getExchangeStatusHandler).Methods("GET")
+	s.router.HandleFunc("/api/exchange", s.createExchangeHandler).Methods("POST")
+	s.router.HandleFunc("/api/exchange/{exchangeId}", s.getExchangeStatusHandler).Methods("GET")
 
-	s.router.HandleFunc("/api/v1/orders", s.createOrderHandler).Methods("POST")
-	s.router.HandleFunc("/api/v1/orders/{orderId}/cancel", s.cancelOrderHandler).Methods("POST")
-	s.router.HandleFunc("/api/v1/orders/{orderId}/replace", s.replaceOrderHandler).Methods("POST")
-	s.router.HandleFunc("/api/v1/orders/{orderId}", s.getOrderHandler).Methods("GET")
-	s.router.HandleFunc("/api/v1/orders/{orderId}/executions", s.getOrderExecutionsHandler).Methods("GET")
-	s.router.HandleFunc("/api/v1/orders", s.getAllOrdersHandler).Methods("GET")
-	s.router.HandleFunc("/api/v1/executions", s.getAllExecutionsHandler).Methods("GET")
+	s.router.HandleFunc("/api/orders", s.createOrderHandler).Methods("POST")
+	s.router.HandleFunc("/api/orders/{orderId}/cancel", s.cancelOrderHandler).Methods("POST")
+	s.router.HandleFunc("/api/orders/{orderId}/replace", s.replaceOrderHandler).Methods("POST")
+	s.router.HandleFunc("/api/orders/{orderId}", s.getOrderHandler).Methods("GET")
+	s.router.HandleFunc("/api/orders/{orderId}/executions", s.getOrderExecutionsHandler).Methods("GET")
+	s.router.HandleFunc("/api/orders", s.getAllOrdersHandler).Methods("GET")
+	s.router.HandleFunc("/api/executions", s.getAllExecutionsHandler).Methods("GET")
 
-	s.router.HandleFunc("/api/v1/status", s.statusHandler).Methods("GET")
+	s.router.HandleFunc("/api/status", s.statusHandler).Methods("GET")
 }
 
 func (s *Server) Start(port int) error {
