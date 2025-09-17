@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/marketdata"
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/orders"
+	"bcb-fix-microservice/pkg/marketdata"
+	"bcb-fix-microservice/pkg/orders"
 	"github.com/gorilla/mux"
 )
 

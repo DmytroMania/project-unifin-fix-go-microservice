@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/bcb"
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/logging"
+	"bcb-fix-microservice/pkg/bcb"
+	"bcb-fix-microservice/pkg/logging"
 	"github.com/quickfixgo/enum"
 	"github.com/quickfixgo/field"
 	"github.com/quickfixgo/fix44/marketdatarequest"

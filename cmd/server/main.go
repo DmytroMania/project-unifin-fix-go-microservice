@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/api"
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/marketdata"
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/orders"
+	"bcb-fix-microservice/pkg/api"
+	"bcb-fix-microservice/pkg/marketdata"
+	"bcb-fix-microservice/pkg/orders"
 )
 
 func main() {

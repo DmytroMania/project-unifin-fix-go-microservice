@@ -4,7 +4,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/auth"
+	"bcb-fix-microservice/pkg/auth"
 	"github.com/quickfixgo/quickfix"
 	"github.com/quickfixgo/tag"
 )

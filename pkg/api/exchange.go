@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/orders"
+	"bcb-fix-microservice/pkg/orders"
 	"github.com/gorilla/mux"
 )
 

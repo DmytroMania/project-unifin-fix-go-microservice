@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/bcb"
-	"github.com/DmytroMania/project-unifin-fix-microservice/pkg/logging"
+	"bcb-fix-microservice/pkg/bcb"
+	"bcb-fix-microservice/pkg/logging"
 	"github.com/quickfixgo/quickfix"
 	"github.com/quickfixgo/tag"
 )
